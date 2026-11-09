@@ -15,10 +15,12 @@ header p{font-size:12px;color:#888;margin:8px 0}
 .label{font-size:13px;color:#777}
 .big{font-size:32px;font-weight:750;margin:10px 0}
 .stats{display:flex;justify-content:space-between;gap:10px}
-.stat{flex:1;background:#f6f7f9;border-radius:12px;padding:13px;text-align:center}
+.stat{flex:1;min-width:0;background:#f6f7f9;border-radius:12px;padding:13px;text-align:center}
 .stat strong{display:block;font-size:19px;margin-top:6px}
-input{width:100%;font-size:30px;padding:17px;border:2px solid #ddd;border-radius:12px;text-align:center;margin:15px 0}
-input:focus{outline:none;border-color:#222}
+.price-wrap{display:flex;align-items:center;border:2px solid #ddd;border-radius:12px;margin:15px 0;padding:0 16px;background:white}
+.price-wrap:focus-within{border-color:#222}
+.price-wrap input{width:100%;min-width:0;font-size:30px;padding:17px 0;border:0;text-align:right;outline:none;background:transparent}
+.suffix{font-size:30px;font-weight:600;color:#555;white-space:nowrap}
 button{border:0;border-radius:12px;padding:16px;font-size:16px;font-weight:bold;cursor:pointer}
 .primary{background:#222;color:white;width:100%}
 .register{background:#2563eb;color:white;width:100%;margin-top:15px}
@@ -27,7 +29,8 @@ button{border:0;border-radius:12px;padding:16px;font-size:16px;font-weight:bold;
 .delete{background:#fee2e2;color:#b91c1c;padding:7px 11px;font-size:12px}
 h2{font-size:17px;margin:0 0 16px}
 .group{border:1px solid #eee;border-radius:12px;padding:15px;margin-top:12px}
-.group-title{display:flex;justify-content:space-between;cursor:pointer;font-weight:bold}
+.group-title{display:flex;justify-content:space-between;gap:8px;cursor:pointer;font-weight:bold}
+.group-date{font-size:12px;color:#888;margin-top:7px}
 .details{margin-top:12px;display:none}
 .empty{color:#aaa;text-align:center;padding:20px;font-size:14px}
 </style>
@@ -40,15 +43,7 @@ h2{font-size:17px;margin:0 0 16px}
 <p>PURCHASE MANAGER</p>
 </header>
 
-<div class="card">
-<div class="label">総仕入れ金額</div>
-<div class="big" id="total">₩0</div>
-<div class="stats">
-<div class="stat"><span class="label">総枚数</span><strong id="count">0枚</strong></div>
-<div class="stat"><span class="label">平均単価</span><strong id="average">₩0</strong></div>
-</div>
-</div>
-
+<!-- 現在の仕入れを先に表示 -->
 <div class="card">
 <h2>現在の仕入れ</h2>
 <div class="stats">
@@ -56,11 +51,24 @@ h2{font-size:17px;margin:0 0 16px}
 <div class="stat"><span class="label">小計</span><strong id="currentTotal">₩0</strong></div>
 </div>
 
-<input type="number" id="price" placeholder="金額を入力" inputmode="numeric">
-<button class="primary" onclick="addItem()">＋ 追加</button>
+<div class="price-wrap">
+<input type="text" id="price" placeholder="金額" inputmode="numeric" autocomplete="off" aria-label="金額（千ウォン単位）">
+<span class="suffix">000 ₩</span>
+</div>
 
+<button class="primary" onclick="addItem()">＋ 追加</button>
 <div id="currentList"></div>
 <button class="register" onclick="registerGroup()">✓ この仕入れを登録</button>
+</div>
+
+<!-- 総仕入れ金額を下に移動 -->
+<div class="card">
+<div class="label">総仕入れ金額</div>
+<div class="big" id="total">₩0</div>
+<div class="stats">
+<div class="stat"><span class="label">総枚数</span><strong id="count">0枚</strong></div>
+<div class="stat"><span class="label">平均単価</span><strong id="average">₩0</strong></div>
+</div>
 </div>
 
 <div class="card">
@@ -73,23 +81,34 @@ h2{font-size:17px;margin:0 0 16px}
 </div>
 
 <script>
-let groups=JSON.parse(localStorage.getItem("oldtownGroups")||"[]");
-let current=JSON.parse(localStorage.getItem("oldtownCurrent")||"[]");
+const STORAGE_GROUPS="oldtownGroups";
+const STORAGE_CURRENT="oldtownCurrent";
+
+let groups=JSON.parse(localStorage.getItem(STORAGE_GROUPS)||"[]");
+let current=JSON.parse(localStorage.getItem(STORAGE_CURRENT)||"[]");
 
 const yen=n=>"₩"+n.toLocaleString("ja-JP");
 
 function save(){
-localStorage.setItem("oldtownGroups",JSON.stringify(groups));
-localStorage.setItem("oldtownCurrent",JSON.stringify(current));
+localStorage.setItem(STORAGE_GROUPS,JSON.stringify(groups));
+localStorage.setItem(STORAGE_CURRENT,JSON.stringify(current));
 }
 
 function addItem(){
 const input=document.getElementById("price");
-const value=Number(input.value);
+const raw=input.value.trim();
+
+if(!/^\d+$/.test(raw)){
+alert("数字を入力してください");
+return;
+}
+
+const value=Number(raw)*1000;
 if(!Number.isSafeInteger(value)||value<=0){
 alert("正しい金額を入力してください");
 return;
 }
+
 current.push(value);
 input.value="";
 save();
@@ -108,7 +127,12 @@ if(current.length===0){
 alert("金額を入力してください");
 return;
 }
-groups.push([...current]);
+
+groups.push({
+items:[...current],
+date:new Date().toISOString()
+});
+
 current=[];
 save();
 render();
@@ -128,6 +152,20 @@ save();
 render();
 }
 
+function formatDate(dateString){
+if(!dateString)return "日時不明";
+const d=new Date(dateString);
+if(Number.isNaN(d.getTime()))return "日時不明";
+return d.toLocaleString("ja-JP",{
+year:"numeric",month:"2-digit",day:"2-digit",
+hour:"2-digit",minute:"2-digit"
+});
+}
+
+function getItems(group){
+return Array.isArray(group)?group:group.items;
+}
+
 function render(){
 const currentTotal=current.reduce((a,b)=>a+b,0);
 document.getElementById("currentCount").textContent=current.length+"枚";
@@ -137,21 +175,25 @@ document.getElementById("currentList").innerHTML=current.map((n,i)=>
 `<div class="row"><span>${i+1}. ${yen(n)}</span><button class="delete" onclick="removeItem(${i})">削除</button></div>`
 ).join("");
 
-const all=groups.flat();
+const all=groups.flatMap(getItems);
 const total=all.reduce((a,b)=>a+b,0);
 document.getElementById("total").textContent=yen(total);
 document.getElementById("count").textContent=all.length+"枚";
 document.getElementById("average").textContent=yen(all.length?Math.round(total/all.length):0);
 
 document.getElementById("history").innerHTML=groups.length?groups.map((group,i)=>{
-const sum=group.reduce((a,b)=>a+b,0);
+const items=getItems(group);
+const sum=items.reduce((a,b)=>a+b,0);
+const date=Array.isArray(group)?"日時不明":formatDate(group.date);
+
 return `<div class="group">
 <div class="group-title" onclick="toggleGroup(${i})">
 <span>仕入れ ${i+1}回目</span>
-<span>${group.length}枚 / ${yen(sum)} ▼</span>
+<span>${items.length}枚 / ${yen(sum)} ▼</span>
 </div>
+<div class="group-date">${date}</div>
 <div class="details" id="details${i}">
-${group.map((n,j)=>`<div class="row">${j+1}. ${yen(n)}</div>`).join("")}
+${items.map((n,j)=>`<div class="row">${j+1}. ${yen(n)}</div>`).join("")}
 </div>
 </div>`;
 }).join(""):'<div class="empty">まだ登録がありません</div>';
