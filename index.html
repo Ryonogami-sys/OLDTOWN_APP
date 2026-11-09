@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OLDTOWN 仕入れ管理</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#222}
+.app{max-width:480px;margin:auto;padding:22px 16px 50px}
+header{text-align:center;padding:18px 0 25px}
+header h1{font-size:25px;margin:0;letter-spacing:1px}
+header p{font-size:12px;color:#888;margin:8px 0}
+.card{background:white;border-radius:18px;padding:22px;margin-bottom:16px;box-shadow:0 3px 15px #00000008}
+.label{font-size:13px;color:#777}
+.big{font-size:32px;font-weight:750;margin:10px 0}
+.stats{display:flex;justify-content:space-between;gap:10px}
+.stat{flex:1;background:#f6f7f9;border-radius:12px;padding:13px;text-align:center}
+.stat strong{display:block;font-size:19px;margin-top:6px}
+input{width:100%;font-size:30px;padding:17px;border:2px solid #ddd;border-radius:12px;text-align:center;margin:15px 0}
+input:focus{outline:none;border-color:#222}
+button{border:0;border-radius:12px;padding:16px;font-size:16px;font-weight:bold;cursor:pointer}
+.primary{background:#222;color:white;width:100%}
+.register{background:#2563eb;color:white;width:100%;margin-top:15px}
+.secondary{background:#eee;width:100%;margin-top:10px}
+.row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding:12px 0;font-size:15px}
+.delete{background:#fee2e2;color:#b91c1c;padding:7px 11px;font-size:12px}
+h2{font-size:17px;margin:0 0 16px}
+.group{border:1px solid #eee;border-radius:12px;padding:15px;margin-top:12px}
+.group-title{display:flex;justify-content:space-between;cursor:pointer;font-weight:bold}
+.details{margin-top:12px;display:none}
+.empty{color:#aaa;text-align:center;padding:20px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+<h1>OLDTOWN</h1>
+<p>PURCHASE MANAGER</p>
+</header>
+
+<div class="card">
+<div class="label">総仕入れ金額</div>
+<div class="big" id="total">₩0</div>
+<div class="stats">
+<div class="stat"><span class="label">総枚数</span><strong id="count">0枚</strong></div>
+<div class="stat"><span class="label">平均単価</span><strong id="average">₩0</strong></div>
+</div>
+</div>
+
+<div class="card">
+<h2>現在の仕入れ</h2>
+<div class="stats">
+<div class="stat"><span class="label">枚数</span><strong id="currentCount">0枚</strong></div>
+<div class="stat"><span class="label">小計</span><strong id="currentTotal">₩0</strong></div>
+</div>
+
+<input type="number" id="price" placeholder="金額を入力" inputmode="numeric">
+<button class="primary" onclick="addItem()">＋ 追加</button>
+
+<div id="currentList"></div>
+<button class="register" onclick="registerGroup()">✓ この仕入れを登録</button>
+</div>
+
+<div class="card">
+<h2>仕入れ履歴</h2>
+<div id="history"></div>
+</div>
+
+<button class="secondary" onclick="resetAll()">すべてのデータを削除</button>
+
+</div>
+
+<script>
+let groups=JSON.parse(localStorage.getItem("oldtownGroups")||"[]");
+let current=JSON.parse(localStorage.getItem("oldtownCurrent")||"[]");
+
+const yen=n=>"₩"+n.toLocaleString("ja-JP");
+
+function save(){
+localStorage.setItem("oldtownGroups",JSON.stringify(groups));
+localStorage.setItem("oldtownCurrent",JSON.stringify(current));
+}
+
+function addItem(){
+const input=document.getElementById("price");
+const value=Number(input.value);
+if(!Number.isSafeInteger(value)||value<=0){
+alert("正しい金額を入力してください");
+return;
+}
+current.push(value);
+input.value="";
+save();
+render();
+input.focus();
+}
+
+function removeItem(index){
+current.splice(index,1);
+save();
+render();
+}
+
+function registerGroup(){
+if(current.length===0){
+alert("金額を入力してください");
+return;
+}
+groups.push([...current]);
+current=[];
+save();
+render();
+document.getElementById("price").focus();
+}
+
+function toggleGroup(index){
+const el=document.getElementById("details"+index);
+el.style.display=el.style.display==="block"?"none":"block";
+}
+
+function resetAll(){
+if(!confirm("すべての仕入れデータを削除しますか？"))return;
+groups=[];
+current=[];
+save();
+render();
+}
+
+function render(){
+const currentTotal=current.reduce((a,b)=>a+b,0);
+document.getElementById("currentCount").textContent=current.length+"枚";
+document.getElementById("currentTotal").textContent=yen(currentTotal);
+
+document.getElementById("currentList").innerHTML=current.map((n,i)=>
+`<div class="row"><span>${i+1}. ${yen(n)}</span><button class="delete" onclick="removeItem(${i})">削除</button></div>`
+).join("");
+
+const all=groups.flat();
+const total=all.reduce((a,b)=>a+b,0);
+document.getElementById("total").textContent=yen(total);
+document.getElementById("count").textContent=all.length+"枚";
+document.getElementById("average").textContent=yen(all.length?Math.round(total/all.length):0);
+
+document.getElementById("history").innerHTML=groups.length?groups.map((group,i)=>{
+const sum=group.reduce((a,b)=>a+b,0);
+return `<div class="group">
+<div class="group-title" onclick="toggleGroup(${i})">
+<span>仕入れ ${i+1}回目</span>
+<span>${group.length}枚 / ${yen(sum)} ▼</span>
+</div>
+<div class="details" id="details${i}">
+${group.map((n,j)=>`<div class="row">${j+1}. ${yen(n)}</div>`).join("")}
+</div>
+</div>`;
+}).join(""):'<div class="empty">まだ登録がありません</div>';
+}
+
+document.getElementById("price").addEventListener("keydown",e=>{
+if(e.key==="Enter")addItem();
+});
+
+render();
+</script>
+</body>
+</html>
