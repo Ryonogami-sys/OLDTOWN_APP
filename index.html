@@ -76,6 +76,9 @@ h2{font-size:17px;margin:0 0 16px}
 <div id="history"></div>
 </div>
 
+<button class="primary" onclick="exportCSV()" style="margin-bottom:12px">
+📥 CSVダウンロード
+</button>
 <button class="secondary" onclick="resetAll()">すべてのデータを削除</button>
 
 </div>
@@ -144,6 +147,41 @@ const el=document.getElementById("details"+index);
 el.style.display=el.style.display==="block"?"none":"block";
 }
 
+function exportCSV(){
+  if(groups.length===0){
+    alert("登録済みの仕入れデータがありません");
+    return;
+  }
+
+  const rows=[["仕入れ回","登録日時","仕入れ金額（KRW）"]];
+
+  groups.forEach((group,i)=>{
+    const items=Array.isArray(group)?group:group.items;
+    const date=Array.isArray(group)?"日時不明":formatDate(group.date);
+
+    items.forEach(price=>{
+      rows.push([i+1,date,price]);
+    });
+  });
+
+  const csv="\uFEFF"+rows.map(row=>row.join(",")).join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,"0");
+
+  const filename=`OLDTOWN_仕入れ_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.csv`;
+
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 function resetAll(){
 if(!confirm("すべての仕入れデータを削除しますか？"))return;
 groups=[];
